@@ -1,4 +1,4 @@
-# dissertation
+# Mortality Coding DNN
 
 This work is a deep neural network that combines word embeddings, recurrent units, and neural attention as mechanisms for the task of automatic assignment of ICD-10 codes for causes of death by analyzing free-text descriptions in death certificates, together with the associated autopsy reports and clinical bulletins.
 
