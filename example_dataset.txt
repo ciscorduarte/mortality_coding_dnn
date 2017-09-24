@@ -1,0 +1,4 @@
+C900 <> 873heGKe7I Infecção respiratória associada a cuidados de saúde 873heGKe7I <> 873heGKe7I Mieloma Múltiplo 873heGKe7I <>  <>  <> 873heGKe7I Insuficiência cardíaca com função sistólica do ventriculo esquerdo comprometida 873heGKe7I <>  <>  <>  <>  <> ['J988', 'C900', 'I509', 'C900'] 
+R54 <> 873heGKe7I Senilidade 873heGKe7I <> 873heGKe7I Insuficiência cardiorespiratoria 873heGKe7I <>  <>  <>  <>  <>  <>  <>  <> ['R54', 'R092', 'R54'] 
+I64 <> 873heGKe7I Acidente Vascular Cerebral 873heGKe7I <>  <>  <>  <>  <>  <>  <>  <>  <> ['I64', 'I64'] 
+J440 <> 873heGKe7I Insuficiência respiratória global 873heGKe7I <> 873heGKe7I Pneumonia associada a cuidados de saúde 873heGKe7I <> 873heGKe7I Doença pulmonar obstrutiva crónica 873heGKe7I <>  <> 873heGKe7I Demência 873heGKe7I <>  <>  <>  <>  <> ['J969', 'J189', 'J449', 'F03', 'J440'] 
