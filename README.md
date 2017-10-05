@@ -28,6 +28,18 @@ For further information about the method, the reader can refer to the following 
 
 The code was tested with Pyhton 3.6.0 and Keras 1.2.2
 
-### 1. Training a model
+### Training a model
 
-Using a `.txt` file with your dataset (see `example_dataset.txt`), execute the `mortality_coding_dnn.py` indicating the dataset file directory in `line 94` of the code.
+1. Using a `.txt` file with your dataset (see `example_dataset.txt`), execute the `mortality_coding_dnn.py` indicating the dataset file directory in `line 94` of the code.
+
+2. After the training is complete, the model saves a `.txt` file with the output (see `example_predictions.txt`)
+
+3. The following files are saved: `dnn_model.h5`, `vocabulary.npy`, `full_codes.npy`, `blocks.npy`. These are the files needed to load the model in a different script.
+
+4. To predict the ICD-10 code of new instances, use `predict_multi.py`. This script loads the files mentioned in the previous point and defines a `PREDICT` function. This function recieves 9 parameters: part 1 a), part 1 b), part 1 c), part 1 d), part 2, clinical bulletin diagnosis field, clinical bulletin circumnstances of admission field, clinical bulletin clinical situation field and autopsy report. See examples:
+
+        PREDICT('Acidente vascular cerebral isquémico do hemisfério direito','Estenose crítica da artéria carótida direita','Doença Ateroscrerótica','','Colecistite aguda gangrenada complicada com choque séptico','','','','')
+    
+        PREDICT('indeterminada','','','','','','','','INTOXICAÇÃO ACIDENTAL POR MONOXIDO DE CARBONO')
+    
+        PREDICT('Insuficiência respiratoria','Doença pulmonar obstrutiva crónica','','','','','','','')
