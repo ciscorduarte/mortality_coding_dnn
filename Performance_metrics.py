@@ -14,7 +14,7 @@ from sklearn import metrics
 # The file predictions.txt has one array for each instance, organized in the following way:
 # true label, 3 most probable 4 digit (full-codes) predicted labels, 3 most probable 3 digit (blocks) predicted labels
 
-labels_pred = np.genfromtxt('.../predictions.txt', dtype = 'str')
+labels_pred = np.genfromtxt('example_predictions.txt', dtype = 'str')
 
 #%%
 
