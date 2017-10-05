@@ -27,3 +27,7 @@ For further information about the method, the reader can refer to the following 
     }
 
 The code was tested with Pyhton 3.6.0 and Keras 1.2.2
+
+### 1. Training a model
+
+Using a `.txt` file with your dataset (see `example_dataset.txt`), execute the `mortality_coding_dnn.py` indicating the dataset file directory in `line 94` of the code.
