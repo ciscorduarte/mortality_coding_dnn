@@ -39,7 +39,10 @@ The code was tested with Pyhton 3.6.0 and Keras 1.2.2
 4. To predict the ICD-10 code of new instances, use `predict_multi.py`. This script loads the files mentioned in the previous point and defines a `PREDICT` function. This function recieves 9 parameters: part 1 a), part 1 b), part 1 c), part 1 d), part 2, clinical bulletin diagnosis field, clinical bulletin circumnstances of admission field, clinical bulletin clinical situation field and autopsy report. See examples:
 
         PREDICT('Acidente vascular cerebral isquémico do hemisfério direito','Estenose crítica da artéria carótida direita','Doença Ateroscrerótica','','Colecistite aguda gangrenada complicada com choque séptico','','','','')
+        >>> 'I632'
     
         PREDICT('indeterminada','','','','','','','','INTOXICAÇÃO ACIDENTAL POR MONOXIDO DE CARBONO')
-    
+        >>> 'X478'
+        
         PREDICT('Insuficiência respiratoria','Doença pulmonar obstrutiva crónica','','','','','','','')
+        >>> 'J449'
