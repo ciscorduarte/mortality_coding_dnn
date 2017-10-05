@@ -91,7 +91,7 @@ pool_size = 4
 print('Loading data...')
 # Shape of each line in dataset:
 # 'Full ICD-10 code of underlying death cause' <> 'Death Certificate' <> 'Clinical Information Bulletin' <> 'Autopsy Report' <> 'Full ICD-10 codes present in Death Certificate'
-texts = [ line.rstrip('\n') for line in codecs.open('DATASET.txt', 
+texts = [ line.rstrip('\n') for line in codecs.open('example_dataset.txt', 
          encoding="utf-8") ]                                                    
 
 # labels_cid is a list of the ICD-10 full code for the underlying death cause for each dataset entry
