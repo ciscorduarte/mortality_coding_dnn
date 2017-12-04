@@ -46,36 +46,6 @@ import jellyfish
 # Stopping Criteria for training the model
 earlyStopping = EarlyStopping(monitor = 'loss', min_delta = 0.3, patience=1, verbose=0, mode='auto')          
 
-# Attention Layer proposed by Yang et al. in 'Hierarchical Attention Networks for Document Classification' 
-class AttLayer(Layer):    
-    def __init__(self, **kwargs):
-        self.init = initializations.get('normal')
-        super(AttLayer, self).__init__(**kwargs)
-    
-    def build(self, input_shape):
-        assert len(input_shape)==3
-        self.W = self.init((input_shape[-1],))
-        self.trainable_weights = [self.W]
-        super(AttLayer, self).build(input_shape)  
-    
-    def call(self, x, mask=None):
-        
-        eij = K.tanh(K.dot(x, self.W))    
-        
-        ai = K.exp(eij)    
-        
-        weights = ai/K.sum(ai, axis=1).dimshuffle(0,'x')
-        
-        self.att = weights
-        # Attention weights are assigned to self.att to allow visualization 
-        
-        weighted_input = x*weights.dimshuffle(0,1,'x')  
-                
-        return weighted_input.sum(axis=1)
-    
-    def get_output_shape_for(self, input_shape):
-        return (input_shape[0], input_shape[-1])
-
 # Set parameters:
 max_features = 50000            # Maximum number of tokens in vocabulary
 maxlen = 400                    # Maximum Length of each Sentence
@@ -93,8 +63,7 @@ pool_size = 4
 print('Loading data...')
 # Shape of each line in dataset:
 # 'Full ICD-10 code of underlying death cause' <> 'Death Certificate' <> 'Clinical Information Bulletin' <> 'Autopsy Report' <> 'Full ICD-10 codes present in Death Certificate'
-texts = [ line.rstrip('\n') for line in codecs.open('example_dataset.txt', 
-         encoding="utf-8") ]                                                    
+texts = [ line.rstrip('\n') for line in codecs.open('example_dataset.txt', encoding="utf-8") ]                                                    
 
 # labels_cid is a list of the ICD-10 full code for the underlying death cause for each dataset entry
 labels_cid = list([ line.split('<>')[0][:-1] for line in texts ])
@@ -319,142 +288,22 @@ print('X_train shape:', X_train.shape)
 print('X_test shape:', X_test.shape)
 
 #%%
-
-print('Computing Initialization with Label Co-occurrence...')
-
-train_labels_aux = [np.where(x != 0)[0] for x in y_train_aux]
-train_labels_3_aux = [np.where(x != 0)[0] for x in y_train_3_aux]
-train_labels_full = [np.where(x != 0)[0] for x in y_train]
-train_labels_3char = [np.where(x != 0)[0] for x in y_train_3char]
-
-train_labels_aux_cid = []
-train_labels_full_cid = []
-
-train_labels_3_aux_cid = []
-train_labels_3char = []
-
-# 4char
-for i in range(len(train_labels_full)):
-    train_labels_full_cid.extend(list(le4.inverse_transform(train_labels_full[i])))
-
-for i in range(len(train_labels_aux)):
-    train_labels_aux_cid.append(list(le4_aux.inverse_transform(train_labels_aux[i])))
-
-# 3char
-for i in range(len(train_labels_3char)):
-    train_labels_3char.extend(list(le3.inverse_transform(train_labels_3char[i])))
-
-for i in range(len(train_labels_3_aux)):
-    train_labels_3_aux_cid.append(list(le3_aux.inverse_transform(train_labels_3_aux[i])))
-
-# 4char
-extra_labels_cid = np.setdiff1d([item for sublist in labels_cid_aux for item in sublist],labels_cid)
-extra_labels = le4_aux.transform(extra_labels_cid)
-
-common_labels_cid = list(set([item for sublist in labels_cid_aux for item in sublist]).intersection(labels_cid))
-common_labels = le4_aux.transform(common_labels_cid)
-
-# 3char
-extra_labels_3_cid = np.setdiff1d([item for sublist in labels_cid_3_aux for item in sublist],labels_cid_3char)
-extra_labels_3 = le3_aux.transform(extra_labels_3_cid)
-
-common_labels_3_cid = list(set([item for sublist in labels_cid_3_aux for item in sublist]).intersection(labels_cid_3char))
-common_labels_3 = le4_aux.transform(common_labels_3_cid)
-
-#%%
-# 4char
-init_m_aux = np.zeros((num_classes,num_classes), dtype=np.float32)
-bias_aux = np.zeros((num_classes,1), dtype=np.float32)
-
-for i in range(len(train_labels_aux)):
-    for j in range(len(train_labels_aux[i])):
-        for k in range(len(train_labels_aux[i])):
-            init_m_aux[train_labels_aux[i][j],train_labels_aux[i][k]] += 1
-
-nmf = NMF(n_components=gru_output_size+embedding_dims)
-init_m_aux = np.log2(init_m_aux + 1)
-nmf.fit(init_m_aux)
-init_m_aux = nmf.components_
-   
-init_m_full = np.zeros((y_train.shape[1],y_train.shape[1]))
-bias_full = np.zeros((y_train.shape[1],1))
-
-for i in range(len(train_labels_aux)):
-    row = [x for x in train_labels_aux_cid[i] if x in common_labels_cid]
-    for j in row:
-        for k in row:
-            a = le4.transform([j])
-            b = le4.transform([k])
-            init_m_full[a,b] += 1
-
-nmf = NMF(n_components=gru_output_size+embedding_dims)
-init_m_full = np.log2(init_m_full + 1)
-nmf.fit(init_m_full)
-init_m_full = nmf.components_
-
-
-#%%
-# 3char
-init_m_3 = np.zeros((y_train_3char.shape[1],y_train_3char.shape[1]))
-bias_3 = np.zeros((y_train_3char.shape[1],1))
-
-for i in range(len(train_labels_3_aux)):
-    row = [x for x in train_labels_3_aux_cid[i] if x in common_labels_3_cid]
-    for j in row:
-        for k in row:
-            a = le3.transform([j])
-            b = le3.transform([k])
-            init_m_3[a,b] += 1
-
-nmf = NMF(n_components=gru_output_size+embedding_dims)
-init_m_3 = np.log2(init_m_3 + 1)
-nmf.fit(init_m_3)
-init_m_3 = nmf.components_
-
-#%%
 print('Build model...')
 
 # Inputs
 review_input = Input(shape=(maxsents,maxlen), dtype='int32')
-
-# Embedding Layer
-embedding_layer = Embedding(max_features, embedding_dims, 
-                            input_length=maxlen)
-
-# WORD-LEVEL
+embedding_layer = Embedding(max_features, embedding_dims, input_length=maxlen)
 sentence_input = Input(shape=(maxlen,), dtype='int32')
 embedded_sequences = embedding_layer(sentence_input)
 
-# Bidirectional GRU
-l_gru = Bidirectional(GRU(gru_output_size, return_sequences=True))(embedded_sequences)
-l_dense = TimeDistributed(Dense(gru_output_size))(l_gru)
-# Word-Level Attention Layer
-l_att = AttLayer()(l_dense)
-sentEncoder = Model(sentence_input, l_att)
-review_encoder = TimeDistributed(sentEncoder)(review_input)
-
-# SENTENCE_LEVEL
-# Bidirectional GRU
-l_gru_sent = Bidirectional(GRU(gru_output_size, return_sequences=True))(review_encoder)
-l_dense_sent = TimeDistributed(Dense(gru_output_size))(l_gru_sent)
-# Sentence-Level Attention Layer
-postp = AttLayer()(l_dense_sent)
-
-# Embedding Average
 sentEmbed = Model(sentence_input, embedded_sequences)
 review_fasttext = TimeDistributed(sentEmbed)(review_input)
 fasttext = GlobalAveragePooling2D()(review_fasttext)
 
-postp_aux = merge( [ postp , fasttext ] , mode='concat', concat_axis = 1 )
-
-postp_aux_drop = Dropout(0.05)(postp_aux)
-
-postp = Dense(output_dim=(gru_output_size+embedding_dims))(postp_aux_drop)
-
 # Softmax
-preds = Dense(y_train.shape[1], activation='softmax', weights=(init_m_full,np.zeros(y_train.shape[1])), name='full_code')(postp)
-preds_3char = Dense(y_train_3char.shape[1], activation='softmax', weights=(init_m_3,np.zeros(y_train_3char.shape[1])), name='block')(postp)
-preds_aux = Dense(y_train_aux.shape[1], activation='sigmoid', weights=(init_m_aux,np.zeros(y_train_aux.shape[1])), name='aux')(postp)
+preds = Dense(y_train.shape[1], activation='softmax')(fasttext)
+preds_3char = Dense(y_train_3char.shape[1], activation='softmax', name='block')(fasttext)
+preds_aux = Dense(y_train_aux.shape[1], activation='sigmoid', name='aux')(fasttext)
 
 model = Model(input = review_input, output = [preds, preds_3char, preds_aux])
 
