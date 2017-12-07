@@ -6,37 +6,15 @@ import numpy as np
 
 np.random.seed(1337) # for reproducibility
 
+import jellyfish
 from keras import backend as K
 from keras.preprocessing.text import text_to_word_sequence
 from keras.models import load_model
 from keras.engine.topology import Layer
 from keras import initializations
 from nltk import tokenize
-import jellyfish
-
-# Custom Attention Layer
-class AttLayer(Layer):
-    def __init__(self, **kwargs):
-        self.init = initializations.get('normal')
-        super(AttLayer, self).__init__(**kwargs)
-
-    def build(self, input_shape):
-        assert len(input_shape)==3
-        self.W = self.init((input_shape[-1],))
-        self.trainable_weights = [self.W]
-        super(AttLayer, self).build(input_shape) 
-
-    def call(self, x, mask=None):
-        eij = K.tanh(K.dot(x, self.W))    
-        ai = K.exp(eij)    
-        weights = ai/K.sum(ai, axis=1).dimshuffle(0,'x')
-        self.att1 = weights        
-        weighted_input = x*weights.dimshuffle(0,1,'x')          
-        self.att2 = weighted_input        
-        return weighted_input.sum(axis=1)
-
-    def get_output_shape_for(self, input_shape):
-        return (input_shape[0], input_shape[-1])
+from attention import AttLayer
+from svmwrapper import SVMWrapper
 
 # Set parameters:
 max_features = 30000            # Maximum number of tokens in vocabulary
@@ -44,18 +22,18 @@ maxlen = 400                    # Maximum Length of each Sentence
 maxsents = 9                    # Maximum Number of Sentences (5 for Death Certificate + 1 for Autopsy Report + 1 for Clinical Information Bulletin)
 
 # Load dictionary
-word_index = np.load('vocabulary.npy').item()
+word_index = np.load('DICT.npy').item()
 inv_word_index = {v: k for k, v in word_index.items()}
 
 # Load ICD-10 to integer codes dictionary
-le4 = np.load('full_codes.npy').item()
-le3 = np.load('blocks.npy').item()
+le4 = np.load('FULL_CODES.npy').item()
+le3 = np.load('BLOCKS.npy').item()
 
 print('Load model...')
-model = load_model('dnn_model.h5', custom_objects = {"AttLayer": AttLayer})
+#model = load_model('modelo_full_nmf.h5', custom_objects = {"AttLayer": AttLayer})
+model = SVMWrapper(filename='modelo_baseline.h5')
 
 #%%
-
 def PREDICT(part_1a, part_1b, part_1c, part_1d, part_2, bic, bic_admiss, bic_sit, ra):
 
     for i in range(len(part_1a)):
@@ -150,3 +128,8 @@ def PREDICT(part_1a, part_1b, part_1c, part_1d, part_2, bic, bic_admiss, bic_sit
         prediction_4.extend(le4.inverse_transform(top3_4))
             
     return prediction_4
+
+
+print(PREDICT(['Acidente vascular cerebral isquémico do hemisfério direito'],['Estenose crítica da artéria carótida direita'],['Doença Ateroscrerótica'],[''],['Colecistite aguda gangrenada complicada com choque séptico'],[''],[''],[''],['']))
+
+print(PREDICT(['indeterminada'],[''],[''],[''],[''],[''],[''],[''],['INTOXICAÇÃO ACIDENTAL POR MONOXIDO DE CARBONO']))

@@ -3,14 +3,16 @@
 
 from __future__ import print_function
 import numpy as np
+np.random.seed(1337) # for reproducibility
+
 import os
 import codecs
 import theano
-np.random.seed(1337) # for reproducibility
-import collections as col
+import jellyfish
 import gc
 import itertools
 import pandas as pd
+import collections as col
 from collections import Counter 
 from keras.preprocessing.text import Tokenizer, text_to_word_sequence
 from keras.preprocessing.sequence import pad_sequences
@@ -41,40 +43,10 @@ from nltk import tokenize
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import NMF
-import jellyfish
+from attention import AttLayer
 
 # Stopping Criteria for training the model
 earlyStopping = EarlyStopping(monitor = 'loss', min_delta = 0.3, patience=1, verbose=0, mode='auto')          
-
-# Attention Layer proposed by Yang et al. in 'Hierarchical Attention Networks for Document Classification' 
-class AttLayer(Layer):    
-    def __init__(self, **kwargs):
-        self.init = initializations.get('normal')
-        super(AttLayer, self).__init__(**kwargs)
-    
-    def build(self, input_shape):
-        assert len(input_shape)==3
-        self.W = self.init((input_shape[-1],))
-        self.trainable_weights = [self.W]
-        super(AttLayer, self).build(input_shape)  
-    
-    def call(self, x, mask=None):
-        
-        eij = K.tanh(K.dot(x, self.W))    
-        
-        ai = K.exp(eij)    
-        
-        weights = ai/K.sum(ai, axis=1).dimshuffle(0,'x')
-        
-        self.att = weights
-        # Attention weights are assigned to self.att to allow visualization 
-        
-        weighted_input = x*weights.dimshuffle(0,1,'x')  
-                
-        return weighted_input.sum(axis=1)
-    
-    def get_output_shape_for(self, input_shape):
-        return (input_shape[0], input_shape[-1])
 
 # Set parameters:
 max_features = 50000            # Maximum number of tokens in vocabulary
@@ -93,8 +65,7 @@ pool_size = 4
 print('Loading data...')
 # Shape of each line in dataset:
 # 'Full ICD-10 code of underlying death cause' <> 'Death Certificate' <> 'Clinical Information Bulletin' <> 'Autopsy Report' <> 'Full ICD-10 codes present in Death Certificate'
-texts = [ line.rstrip('\n') for line in codecs.open('example_dataset.txt', 
-         encoding="utf-8") ]                                                    
+texts = [ line.rstrip('\n') for line in codecs.open('example_dataset.txt', encoding="utf-8") ]                                                    
 
 # labels_cid is a list of the ICD-10 full code for the underlying death cause for each dataset entry
 labels_cid = list([ line.split('<>')[0][:-1] for line in texts ])

@@ -34,15 +34,15 @@ The code was tested with Pyhton 3.6.0 and Keras 1.2.2
 
 2. After the training is complete, the model saves a `.txt` file with the output (see `example_predictions.txt`)
 
-3. The following files are saved: `dnn_model.h5`, `vocabulary.npy`, `full_codes.npy`, `blocks.npy`. These are the files needed to load the model in a different script.
+3. The following files are saved: `modelo_full_nmf.h5`, `DICT.npy`, `FULL_CODES.npy`, `BLOCKS.npy`. These are the files needed to load the model in a different script.
 
 4. To predict the ICD-10 code of new instances, use `predict_multi.py`. This script loads the files mentioned in the previous point and defines a `PREDICT` function. This function recieves 9 parameters: part 1 a), part 1 b), part 1 c), part 1 d), part 2, clinical bulletin diagnosis field, clinical bulletin circumnstances of admission field, clinical bulletin clinical situation field and autopsy report. See examples:
 
-        PREDICT('Acidente vascular cerebral isquémico do hemisfério direito','Estenose crítica da artéria carótida direita','Doença Ateroscrerótica','','Colecistite aguda gangrenada complicada com choque séptico','','','','')
+        PREDICT(['Acidente vascular cerebral isquémico do hemisfério direito'],['Estenose crítica da artéria carótida direita'],['Doença Ateroscrerótica'],[''],['Colecistite aguda gangrenada complicada com choque séptico'],[''],[''],[''],[''])
         >>> 'I632'
     
-        PREDICT('indeterminada','','','','','','','','INTOXICAÇÃO ACIDENTAL POR MONOXIDO DE CARBONO')
+        PREDICT(['indeterminada'],[''],[''],[''],[''],[''],[''],[''],['INTOXICAÇÃO ACIDENTAL POR MONOXIDO DE CARBONO'])
         >>> 'X478'
         
-        PREDICT('Insuficiência respiratoria','Doença pulmonar obstrutiva crónica','','','','','','','')
+        PREDICT(['Insuficiência respiratoria'],['Doença pulmonar obstrutiva crónica'],[''],[''],[''],[''],[''],[''],[''])
         >>> 'J449'

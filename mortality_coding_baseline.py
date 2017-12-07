@@ -3,13 +3,16 @@
 
 from __future__ import print_function
 import numpy as np
+np.random.seed(1337) # for reproducibility
+
 import os
 import codecs
 import theano
-np.random.seed(1337) # for reproducibility
-import collections as col
 import gc
 import itertools
+import sklearn
+import jellyfish
+import collections as col
 import pandas as pd
 from collections import Counter 
 from keras.preprocessing.text import Tokenizer, text_to_word_sequence
@@ -41,10 +44,9 @@ from nltk import tokenize
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import NMF
-import jellyfish
-
-# Stopping Criteria for training the model
-earlyStopping = EarlyStopping(monitor = 'loss', min_delta = 0.3, patience=1, verbose=0, mode='auto')          
+from sklearn.svm import LinearSVC
+from sklearn.feature_extraction.text import TfidfVectorizer
+from svmwrapper import SVMWrapper
 
 # Set parameters:
 max_features = 50000            # Maximum number of tokens in vocabulary
@@ -63,7 +65,8 @@ pool_size = 4
 print('Loading data...')
 # Shape of each line in dataset:
 # 'Full ICD-10 code of underlying death cause' <> 'Death Certificate' <> 'Clinical Information Bulletin' <> 'Autopsy Report' <> 'Full ICD-10 codes present in Death Certificate'
-texts = [ line.rstrip('\n') for line in codecs.open('example_dataset.txt', encoding="utf-8") ]                                                    
+texts = [ line.rstrip('\n') for line in codecs.open('example_dataset.txt', 
+         encoding="utf-8") ]                                                    
 
 # labels_cid is a list of the ICD-10 full code for the underlying death cause for each dataset entry
 labels_cid = list([ line.split('<>')[0][:-1] for line in texts ])
@@ -287,38 +290,15 @@ for i, sentences in enumerate(X_test_ra):
 print('X_train shape:', X_train.shape)
 print('X_test shape:', X_test.shape)
 
-#%%
 print('Build model...')
-
-# Inputs
-review_input = Input(shape=(maxsents,maxlen), dtype='int32')
-embedding_layer = Embedding(max_features, embedding_dims, input_length=maxlen)
-sentence_input = Input(shape=(maxlen,), dtype='int32')
-embedded_sequences = embedding_layer(sentence_input)
-
-sentEmbed = Model(sentence_input, embedded_sequences)
-review_fasttext = TimeDistributed(sentEmbed)(review_input)
-fasttext = GlobalAveragePooling2D()(review_fasttext)
-
-# Softmax
-preds = Dense(y_train.shape[1], activation='softmax')(fasttext)
-preds_3char = Dense(y_train_3char.shape[1], activation='softmax', name='block')(fasttext)
-preds_aux = Dense(y_train_aux.shape[1], activation='sigmoid', name='aux')(fasttext)
-
-model = Model(input = review_input, output = [preds, preds_3char, preds_aux])
-
-model.compile(loss=['categorical_crossentropy','categorical_crossentropy','binary_crossentropy'], optimizer='adam', 
-              metrics=['accuracy'], loss_weights = [0.8 , 0.85, 0.75])
+model = SVMWrapper()
 
 #%%
-
-model.fit(X_train, [y_train, y_train_3char, y_train_aux], batch_size=batch_size, nb_epoch=nb_epoch, 
-          validation_data=(X_test, [y_test, y_test_3char, y_test_aux]), callbacks=[earlyStopping])
-
-model.save('modelo_full_nmf.h5')
+model.fit(X_train, y_train, validation_data=(X_test,y_test))
+model.save('modelo_baseline.h5')
 
 print('Predicting...')
-[all_4, all_3, all_aux] = model.predict(X_test, batch_size=3)
+all_4 = model.predict(X_test)[0]
 
 print('Writing output...')
 
@@ -326,10 +306,7 @@ cid_pred = np.zeros([len(y_test),7], dtype = object)
 
 for i in range(len(y_test)):
     top3_4 = np.argsort(all_4[i])[-3:]
-    top3_3 = np.argsort(all_3[i])[-3:]
     cid_pred[i][0] = le4.inverse_transform(np.argmax(y_test[i]))
-    for j in [1,2,3]:
-        cid_pred[i][j] = le4.inverse_transform(top3_4[-j])
-        cid_pred[i][3+j] = le3.inverse_transform(top3_3[-j])
+    for j in [1,2,3]: cid_pred[i][j] = le4.inverse_transform(top3_4[-j])
 
-np.savetxt('pred_full_nmf.txt', cid_pred, delimiter=" ", fmt="%s")
+np.savetxt('pred_baseline.txt', cid_pred, delimiter=" ", fmt="%s")
