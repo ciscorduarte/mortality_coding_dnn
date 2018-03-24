@@ -2,8 +2,17 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import print_function
-import numpy as np
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+    warnings.filterwarnings("ignore",category=FutureWarning)
+    warnings.filterwarnings("ignore",category=UserWarning)
+    import sklearn
+    import h5py
+    import keras
+
+import numpy as np    
 np.random.seed(1337) # for reproducibility
 
 import jellyfish
@@ -11,7 +20,6 @@ from keras import backend as K
 from keras.preprocessing.text import text_to_word_sequence
 from keras.models import load_model
 from keras.engine.topology import Layer
-from keras import initializations
 from nltk import tokenize
 from attention import AttLayer
 from svmwrapper import SVMWrapper
