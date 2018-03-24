@@ -53,6 +53,8 @@ from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
 from sklearn.decomposition import NMF
 from attention import AttLayer
+from svmwrapper import SVMWrapper
+from lmwrapper import LMWrapper
 
 # Stopping Criteria for training the model
 earlyStopping = EarlyStopping(monitor = 'loss', min_delta = 0.3, patience=1, verbose=0, mode='auto')          
@@ -396,10 +398,10 @@ print('Build model...')
 
 # Inputs
 review_input = Input(shape=(maxsents,maxlen), dtype='int32')
+aux_input = Input(shape=(y_train.shape[1],), dtype='float32')
 
 # Embedding Layer
-embedding_layer = Embedding(max_features, embedding_dims, 
-                            input_length=maxlen)
+embedding_layer = Embedding(max_features, embedding_dims, input_length=maxlen)
 
 # WORD-LEVEL
 sentence_input = Input(shape=(maxlen,), dtype='int32')
@@ -426,30 +428,29 @@ review_fasttext = TimeDistributed(sentEmbed)(review_input)
 fasttext = GlobalAveragePooling2D()(review_fasttext)
 
 postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp , fasttext ] )
+postp_aux = Dropout(0.05)(postp_aux)
+postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp_aux , aux_input ] )
 
-postp_aux_drop = Dropout(0.05)(postp_aux)
-
-postp = Dense(units=(gru_output_size+embedding_dims))(postp_aux_drop)
+postp = Dense(units=(gru_output_size+embedding_dims))(postp_aux)
 
 # Softmax
 preds = Dense(units=y_train.shape[1], activation='softmax', weights=(init_m_full,np.zeros(y_train.shape[1])), name='full_code')(postp)
 preds_3char = Dense(units=y_train_3char.shape[1], activation='softmax', weights=(init_m_3,np.zeros(y_train_3char.shape[1])), name='block')(postp)
 preds_aux = Dense(units=y_train_aux.shape[1], activation='sigmoid', weights=(init_m_aux,np.zeros(y_train_aux.shape[1])), name='aux')(postp)
 
-model = Model(inputs = review_input, outputs = [preds, preds_3char, preds_aux])
+model = LMWrapper()
+model.fit(X_train, y_train, validation_data=(X_test,y_test))
+model.save('modelo_baseline.h5')
+X_train_aux = model.predict_prob(X_train)[0]
+X_test_aux = model.predict_prob(X_test)[0]
 
-model.compile(loss=['categorical_crossentropy','categorical_crossentropy','binary_crossentropy'], optimizer='adam', 
-              metrics=['accuracy'], loss_weights = [0.8 , 0.85, 0.75])
-
-#%%
-
-model.fit(X_train, [y_train, y_train_3char, y_train_aux], batch_size=batch_size, epochs=nb_epoch, 
-          validation_data=(X_test, [y_test, y_test_3char, y_test_aux]), callbacks=[earlyStopping])
-
+model = Model(inputs = [review_input, aux_input], outputs = [preds, preds_3char, preds_aux])
+model.compile(loss=['categorical_crossentropy','categorical_crossentropy','binary_crossentropy'], optimizer='adam', metrics=['accuracy'], loss_weights = [0.8 , 0.85, 0.75])
+model.fit([ X_train , X_train_aux ] , [y_train, y_train_3char, y_train_aux], batch_size=batch_size, epochs=nb_epoch, validation_data=([X_test,X_test_aux], [y_test, y_test_3char, y_test_aux]), callbacks=[earlyStopping])
 model.save('modelo_full_nmf.h5')
 
 print('Predicting...')
-[all_4, all_3, all_aux] = model.predict(X_test, batch_size=3)
+[all_4, all_3, all_aux] = model.predict([X_test,X_test_aux], batch_size=3)
 
 print('Writing output...')
 

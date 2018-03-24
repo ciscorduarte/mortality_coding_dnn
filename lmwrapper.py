@@ -55,6 +55,14 @@ class LMWrapper(Model):
             auxY = np.pad(auxY, pad_width=npad, mode='constant', constant_values=0)
         return [ auxY, [], [] ]
 	
+    def predict_prob(self, x):
+        auxX = self.build_representation(x,fit=False)
+        auxY = self.lm.predict_proba(auxX)
+        if auxY.shape[1] < self.output_dim:
+            npad = ((0, 0), (0, self.output_dim-auxY.shape[1]))
+            auxY = np.pad(auxY, pad_width=npad, mode='constant', constant_values=0)
+        return [ auxY, [], [] ]
+        
     def evaluate(self, x, y):
         auxX = self.build_representation(x,fit=False)
         auxY = y
