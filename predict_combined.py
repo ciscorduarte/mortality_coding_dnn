@@ -39,9 +39,8 @@ le4 = np.load('FULL_CODES.npy').item()
 le3 = np.load('BLOCKS.npy').item()
 
 print('Load model...')
+model_aux = LMWrapper(filename='modelo_baseline.h5')
 model = load_model('modelo_full_nmf.h5', custom_objects = {"AttLayer": AttLayer})
-#model = SVMWrapper(filename='modelo_baseline.h5')
-#model = LMWrapper(filename='modelo_baseline.h5')
 
 #%%
 def PREDICT(part_1a, part_1b, part_1c, part_1d, part_2, bic, bic_admiss, bic_sit, ra):
@@ -129,7 +128,7 @@ def PREDICT(part_1a, part_1b, part_1c, part_1d, part_2, bic, bic_admiss, bic_sit
                         k = k + 1
                             
 # 'Predicting...'
-    [all_4, all_3, aux] = model.predict(data)
+    [all_4, all_3, aux] = model.predict([data,model_aux.predict_prob(data)[0]])
         
     prediction_4 = []
     
