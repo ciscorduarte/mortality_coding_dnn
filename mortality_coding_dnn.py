@@ -5,6 +5,15 @@ from __future__ import print_function
 import numpy as np
 np.random.seed(1337) # for reproducibility
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+    warnings.filterwarnings("ignore",category=FutureWarning)
+    warnings.filterwarnings("ignore",category=UserWarning)
+    import sklearn
+    import h5py     
+    import keras
+    
 import os
 import codecs
 import theano
@@ -25,19 +34,19 @@ from keras.layers import Dense
 from keras.layers import Embedding
 from keras.layers import GlobalAveragePooling1D
 from keras.layers import GlobalAveragePooling2D
+from keras.layers import GlobalMaxPooling1D
+from keras.layers import GlobalMaxPooling2D
 from keras.layers import Dropout
 from keras.layers import LSTM
-from keras.layers import merge
 from keras.layers import Input
 from keras.layers import Flatten
 from keras.layers import Convolution1D, MaxPooling1D
-from keras.layers import Conv1D, MaxPooling1D, Embedding, Merge, Dropout, LSTM, GRU, Bidirectional, TimeDistributed
+from keras.layers import Conv1D, MaxPooling1D, Embedding, Dropout, LSTM, GRU, Bidirectional, TimeDistributed
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.models import load_model
 from keras import backend as K
 from keras.engine.topology import Layer, InputSpec
-from keras import initializations
 from sklearn.cross_validation import StratifiedKFold
 from nltk import tokenize
 from sklearn import preprocessing
@@ -127,12 +136,12 @@ labels_3char = to_categorical(labels_int_3char)
 num_classes=1+max([max(x) for x in labels_int_aux])    
 labels_aux = np.zeros((len(labels), num_classes), dtype=np.float64)
 for i in range(len(labels_int_aux)):
-    labels_aux[i,:] = sum( to_categorical(labels_int_aux[i], nb_classes=num_classes))
+    labels_aux[i,:] = sum( to_categorical(labels_int_aux[i],num_classes))
     
 num_classes_3=1+max([max(x) for x in labels_int_3_aux])    
 labels_3_aux = np.zeros((len(labels), num_classes_3), dtype=np.float64)
 for i in range(len(labels_int_3_aux)):
-    labels_3_aux[i,:] = sum( to_categorical(labels_int_3_aux[i], nb_classes=num_classes_3))
+    labels_3_aux[i,:] = sum( to_categorical(labels_int_3_aux[i],num_classes_3))
 
 #%%
 
@@ -153,7 +162,7 @@ X_train_bic_sit, X_test_bic_sit, y_train, y_test = train_test_split(bic_sit, lab
 X_train_ra, X_test_ra, y_train, y_test = train_test_split(ra, labels, stratify = labels_cid, test_size = 0.25, random_state=42)
 
 #%%
-tokenizer = Tokenizer(nb_words = max_features)
+tokenizer = Tokenizer(num_words = max_features)
 tokenizer.fit_on_texts(X_train_1a+X_train_1b+X_train_1c+X_train_1d+X_train_2+X_train_bic+X_train_bic_admiss+X_train_bic_sit+X_train_ra)
 
 # attribute an integer to each token that occures in the texts 
@@ -398,7 +407,7 @@ embedded_sequences = embedding_layer(sentence_input)
 
 # Bidirectional GRU
 l_gru = Bidirectional(GRU(gru_output_size, return_sequences=True))(embedded_sequences)
-l_dense = TimeDistributed(Dense(gru_output_size))(l_gru)
+l_dense = TimeDistributed(Dense(units=gru_output_size))(l_gru)
 # Word-Level Attention Layer
 l_att = AttLayer()(l_dense)
 sentEncoder = Model(sentence_input, l_att)
@@ -407,7 +416,7 @@ review_encoder = TimeDistributed(sentEncoder)(review_input)
 # SENTENCE_LEVEL
 # Bidirectional GRU
 l_gru_sent = Bidirectional(GRU(gru_output_size, return_sequences=True))(review_encoder)
-l_dense_sent = TimeDistributed(Dense(gru_output_size))(l_gru_sent)
+l_dense_sent = TimeDistributed(Dense(units=gru_output_size))(l_gru_sent)
 # Sentence-Level Attention Layer
 postp = AttLayer()(l_dense_sent)
 
@@ -416,25 +425,25 @@ sentEmbed = Model(sentence_input, embedded_sequences)
 review_fasttext = TimeDistributed(sentEmbed)(review_input)
 fasttext = GlobalAveragePooling2D()(review_fasttext)
 
-postp_aux = merge( [ postp , fasttext ] , mode='concat', concat_axis = 1 )
+postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp , fasttext ] )
 
 postp_aux_drop = Dropout(0.05)(postp_aux)
 
-postp = Dense(output_dim=(gru_output_size+embedding_dims))(postp_aux_drop)
+postp = Dense(units=(gru_output_size+embedding_dims))(postp_aux_drop)
 
 # Softmax
-preds = Dense(y_train.shape[1], activation='softmax', weights=(init_m_full,np.zeros(y_train.shape[1])), name='full_code')(postp)
-preds_3char = Dense(y_train_3char.shape[1], activation='softmax', weights=(init_m_3,np.zeros(y_train_3char.shape[1])), name='block')(postp)
-preds_aux = Dense(y_train_aux.shape[1], activation='sigmoid', weights=(init_m_aux,np.zeros(y_train_aux.shape[1])), name='aux')(postp)
+preds = Dense(units=y_train.shape[1], activation='softmax', weights=(init_m_full,np.zeros(y_train.shape[1])), name='full_code')(postp)
+preds_3char = Dense(units=y_train_3char.shape[1], activation='softmax', weights=(init_m_3,np.zeros(y_train_3char.shape[1])), name='block')(postp)
+preds_aux = Dense(units=y_train_aux.shape[1], activation='sigmoid', weights=(init_m_aux,np.zeros(y_train_aux.shape[1])), name='aux')(postp)
 
-model = Model(input = review_input, output = [preds, preds_3char, preds_aux])
+model = Model(inputs = review_input, outputs = [preds, preds_3char, preds_aux])
 
 model.compile(loss=['categorical_crossentropy','categorical_crossentropy','binary_crossentropy'], optimizer='adam', 
               metrics=['accuracy'], loss_weights = [0.8 , 0.85, 0.75])
 
 #%%
 
-model.fit(X_train, [y_train, y_train_3char, y_train_aux], batch_size=batch_size, nb_epoch=nb_epoch, 
+model.fit(X_train, [y_train, y_train_3char, y_train_aux], batch_size=batch_size, epochs=nb_epoch, 
           validation_data=(X_test, [y_test, y_test_3char, y_test_aux]), callbacks=[earlyStopping])
 
 model.save('modelo_full_nmf.h5')
