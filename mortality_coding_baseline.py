@@ -5,6 +5,14 @@ from __future__ import print_function
 import numpy as np
 np.random.seed(1337) # for reproducibility
 
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore",category=DeprecationWarning)
+    warnings.filterwarnings("ignore",category=FutureWarning)
+    warnings.filterwarnings("ignore",category=UserWarning)
+    import sklearn
+    import h5py     
+    import keras
 import os
 import codecs
 import theano
@@ -21,32 +29,16 @@ from keras.utils.np_utils import to_categorical
 from keras.preprocessing import sequence
 from keras.models import Sequential
 from keras.callbacks import EarlyStopping
-from keras.layers.core import Masking
-from keras.layers import Dense
-from keras.layers import Embedding
-from keras.layers import GlobalAveragePooling1D
-from keras.layers import GlobalAveragePooling2D
-from keras.layers import Dropout
-from keras.layers import LSTM
-from keras.layers import merge
-from keras.layers import Input
-from keras.layers import Flatten
-from keras.layers import Convolution1D, MaxPooling1D
-from keras.layers import Conv1D, MaxPooling1D, Embedding, Merge, Dropout, LSTM, GRU, Bidirectional, TimeDistributed
-from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.models import load_model
 from keras import backend as K
 from keras.engine.topology import Layer, InputSpec
-from keras import initializations
 from sklearn.cross_validation import StratifiedKFold
 from nltk import tokenize
 from sklearn import preprocessing
 from sklearn.model_selection import train_test_split
-from sklearn.decomposition import NMF
-from sklearn.svm import LinearSVC
-from sklearn.feature_extraction.text import TfidfVectorizer
 from svmwrapper import SVMWrapper
+from lmwrapper import LMWrapper
 
 # Set parameters:
 max_features = 50000            # Maximum number of tokens in vocabulary
@@ -128,12 +120,12 @@ labels_3char = to_categorical(labels_int_3char)
 num_classes=1+max([max(x) for x in labels_int_aux])    
 labels_aux = np.zeros((len(labels), num_classes), dtype=np.float64)
 for i in range(len(labels_int_aux)):
-    labels_aux[i,:] = sum( to_categorical(labels_int_aux[i], nb_classes=num_classes))
+    labels_aux[i,:] = sum( to_categorical(labels_int_aux[i], num_classes=num_classes))
     
 num_classes_3=1+max([max(x) for x in labels_int_3_aux])    
 labels_3_aux = np.zeros((len(labels), num_classes_3), dtype=np.float64)
 for i in range(len(labels_int_3_aux)):
-    labels_3_aux[i,:] = sum( to_categorical(labels_int_3_aux[i], nb_classes=num_classes_3))
+    labels_3_aux[i,:] = sum( to_categorical(labels_int_3_aux[i], num_classes=num_classes_3))
 
 #%%
 
@@ -154,7 +146,7 @@ X_train_bic_sit, X_test_bic_sit, y_train, y_test = train_test_split(bic_sit, lab
 X_train_ra, X_test_ra, y_train, y_test = train_test_split(ra, labels, stratify = labels_cid, test_size = 0.25, random_state=42)
 
 #%%
-tokenizer = Tokenizer(nb_words = max_features)
+tokenizer = Tokenizer(num_words = max_features)
 tokenizer.fit_on_texts(X_train_1a+X_train_1b+X_train_1c+X_train_1d+X_train_2+X_train_bic+X_train_bic_admiss+X_train_bic_sit+X_train_ra)
 
 # attribute an integer to each token that occures in the texts 
@@ -291,7 +283,8 @@ print('X_train shape:', X_train.shape)
 print('X_test shape:', X_test.shape)
 
 print('Build model...')
-model = SVMWrapper()
+#model = SVMWrapper()
+model = LMWrapper()
 
 #%%
 model.fit(X_train, y_train, validation_data=(X_test,y_test))

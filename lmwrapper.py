@@ -7,16 +7,16 @@ import pickle
 import numpy as np
 from keras.models import Model
 from keras.utils.np_utils import to_categorical
-from sklearn.svm import LinearSVC
+from sklearn.naive_bayes import MultinomialNB
 from sklearn.feature_extraction.text import TfidfVectorizer
 
-# Wraper over the SVM classifier from sklearn
-class SVMWrapper(Model):
+# Wraper over the MultinomialNB classifier from sklearn
+class LMWrapper(Model):
 
-    def __init__(self, C=1.0, use_idf=True, two_vectors=True, filename=None, **kwargs):
-        self.svmmodel = LinearSVC( C=C , random_state=0 )
-        self.vect1 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0)
-        self.vect2 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0)
+    def __init__(self, C=1.0, use_idf=False, two_vectors=True, filename=None, **kwargs):
+        self.lm = MultinomialNB( )
+        self.vect1 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0, ngram_range=(1, 2))
+        self.vect2 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0, ngram_range=(1, 2))
         self.output_dim = 0
         self.two_vectors = two_vectors
         if filename is not None: self.load(filename)
@@ -39,7 +39,7 @@ class SVMWrapper(Model):
     def fit( self, x, y, validation_data=None):
         auxX = self.build_representation(x,fit=True)
         auxY = y
-        self.svmmodel.fit( auxX , np.array([ np.argmax(i) for i in auxY ]) )
+        self.lm.fit( auxX , np.array([ np.argmax(i) for i in auxY ]) )
         self.output_dim = auxY.shape[1]
         if validation_data is None: return None
         res = self.evaluate( validation_data[0] , validation_data[1] )
@@ -48,7 +48,7 @@ class SVMWrapper(Model):
 		
     def predict(self, x):
         auxX = self.build_representation(x,fit=False)
-        auxY = self.svmmodel.predict(auxX)
+        auxY = self.lm.predict(auxX)
         auxY = to_categorical(auxY)
         if auxY.shape[1] < self.output_dim:
             npad = ((0, 0), (0, self.output_dim-auxY.shape[1]))
@@ -59,11 +59,11 @@ class SVMWrapper(Model):
         auxX = self.build_representation(x,fit=False)
         auxY = y
         auxY = np.array([ np.argmax(i) for i in auxY ])
-        return sklearn.metrics.accuracy_score(y_true=auxY,y_pred=self.svmmodel.predict(auxX))
+        return sklearn.metrics.accuracy_score(y_true=auxY,y_pred=self.lm.predict(auxX))
 	
     def save(self, filename):
         f = open(filename, "wb")
-        pickle.dump(self.svmmodel, f)
+        pickle.dump(self.lm, f)
         pickle.dump(self.vect1, f)
         pickle.dump(self.vect2, f)
         pickle.dump(self.output_dim, f)
@@ -72,7 +72,7 @@ class SVMWrapper(Model):
 	
     def load(self, filename): 
         f = open(filename, "rb")
-        self.svmmodel = pickle.load(f)
+        self.lm = pickle.load(f)
         self.vect1 = pickle.load(f)
         self.vect2 = pickle.load(f)
         self.output_dim = pickle.load(f)
