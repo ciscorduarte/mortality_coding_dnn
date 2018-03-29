@@ -16,7 +16,7 @@ This neural network also explores the hierarchical nature of the input data, by 
 
 Moreover, a mechanism for initializing the weights of the final nodes of the network is also used, leveraging co-occurrences between classes togheter with the hierarchical structure of ICD-10.
 
-For further information about the method, the reader can refer to the following publication: 
+For further information about the method, the reader can refer to the following two publications: 
 
     @inproceedings{duarte2017deep,
       title={A Deep Learning Method for ICD-10 Coding of Free-Text Death Certificates},
@@ -26,7 +26,15 @@ For further information about the method, the reader can refer to the following 
       url={https://link.springer.com/chapter/10.1007/978-3-319-65340-2_12}
     }
 
-The code was tested with Pyhton 3.6.0 and Keras 1.2.2
+    @article{duarte2018deep,
+      title={Deep Neural Models for ICD-10 Coding of Death Certificates and Autopsy Reports in Free-Text},
+      author={Duarte, Francisco and Martins, Bruno and Pinto, C{\'a}tia Sousa and Silva, M{\'a}rio J},
+      journal={Journal of Biomedical Informatics},
+      year={2018},
+      url={http://linkinghub.elsevier.com/retrieve/pii/S1532046418300303}
+    }
+
+The code was tested with Pyhton 3.6.0 and Keras 2.1.5
 
 ### Training a model
 
