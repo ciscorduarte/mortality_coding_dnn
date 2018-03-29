@@ -36,12 +36,13 @@ from keras.layers import GlobalAveragePooling1D
 from keras.layers import GlobalAveragePooling2D
 from keras.layers import GlobalMaxPooling1D
 from keras.layers import GlobalMaxPooling2D
+from keras.layers import Reshape
 from keras.layers import Dropout
 from keras.layers import LSTM
 from keras.layers import Input
 from keras.layers import Flatten
 from keras.layers import Convolution1D, MaxPooling1D
-from keras.layers import Conv1D, MaxPooling1D, Embedding, Dropout, LSTM, GRU, Bidirectional, TimeDistributed
+from keras.layers import Conv1D, MaxPool1D, Conv2D, MaxPool2D, Embedding, Dropout, LSTM, GRU, Bidirectional, TimeDistributed
 from keras.layers.normalization import BatchNormalization
 from keras.models import Model
 from keras.models import load_model
@@ -407,10 +408,27 @@ embedding_layer = Embedding(max_features, embedding_dims, input_length=maxlen)
 sentence_input = Input(shape=(maxlen,), dtype='int32')
 embedded_sequences = embedding_layer(sentence_input)
 
+# Embedding Average or Convolutional Neural Network
+sentEmbed = Model(sentence_input, embedded_sequences)
+review_fasttext = TimeDistributed(sentEmbed)(review_input)
+#fasttext = GlobalAveragePooling2D()(review_fasttext)
+reshape = Reshape((maxsents*maxlen,embedding_dims))(review_fasttext)
+conv1 = Conv1D(gru_output_size, kernel_size=2, activation='relu')(reshape)
+conv1 = MaxPool1D(int((maxsents*maxlen)/5))(conv1)
+conv1 = Flatten()(conv1)
+conv2 = Conv1D(gru_output_size, kernel_size=4, activation='relu')(reshape)
+conv2 = MaxPool1D(int((maxsents*maxlen)/5))(conv2)
+conv2 = Flatten()(conv2)
+conv3 = Conv1D(gru_output_size, kernel_size=8, activation='relu')(reshape)
+conv3 = MaxPool1D(int((maxsents*maxlen)/5))(conv3)
+conv3 = Flatten()(conv3)
+concatenated_tensor = keras.layers.Concatenate(axis=1)([conv1,conv2,conv3])
+fasttext = Dense(units=gru_output_size, activation='relu')(concatenated_tensor)
+
 # Bidirectional GRU
 l_gru = Bidirectional(GRU(gru_output_size, return_sequences=True))(embedded_sequences)
-l_dense = TimeDistributed(Dense(units=gru_output_size))(l_gru)
 # Word-Level Attention Layer
+l_dense = TimeDistributed(Dense(units=gru_output_size))(l_gru)
 l_att = AttLayer()(l_dense)
 sentEncoder = Model(sentence_input, l_att)
 review_encoder = TimeDistributed(sentEncoder)(review_input)
@@ -418,18 +436,17 @@ review_encoder = TimeDistributed(sentEncoder)(review_input)
 # SENTENCE_LEVEL
 # Bidirectional GRU
 l_gru_sent = Bidirectional(GRU(gru_output_size, return_sequences=True))(review_encoder)
-l_dense_sent = TimeDistributed(Dense(units=gru_output_size))(l_gru_sent)
 # Sentence-Level Attention Layer
+l_gru_sent = keras.layers.Concatenate()( [ l_gru_sent , keras.layers.RepeatVector(maxsents)(fasttext) ] )
+l_dense_sent = TimeDistributed(Dense(units=gru_output_size))(l_gru_sent)
 postp = AttLayer()(l_dense_sent)
 
-# Embedding Average
-sentEmbed = Model(sentence_input, embedded_sequences)
-review_fasttext = TimeDistributed(sentEmbed)(review_input)
-fasttext = GlobalAveragePooling2D()(review_fasttext)
+#Memory
+aux_mem = Dense(units=(gru_output_size+embedding_dims), activation='relu', weights=(init_m_full.transpose(),np.zeros(gru_output_size+embedding_dims)), name='memory')(aux_input)
 
 postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp , fasttext ] )
 postp_aux = Dropout(0.05)(postp_aux)
-postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp_aux , aux_input ] )
+postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp_aux , aux_mem ] )
 
 postp = Dense(units=(gru_output_size+embedding_dims))(postp_aux)
 
@@ -446,6 +463,7 @@ X_test_aux = model.predict_prob(X_test)[0]
 
 model = Model(inputs = [review_input, aux_input], outputs = [preds, preds_3char, preds_aux])
 model.compile(loss=['categorical_crossentropy','categorical_crossentropy','binary_crossentropy'], optimizer='adam', metrics=['accuracy'], loss_weights = [0.8 , 0.85, 0.75])
+model.summary()
 model.fit([ X_train , X_train_aux ] , [y_train, y_train_3char, y_train_aux], batch_size=batch_size, epochs=nb_epoch, validation_data=([X_test,X_test_aux], [y_test, y_test_3char, y_test_aux]), callbacks=[earlyStopping])
 model.save('modelo_full_nmf.h5')
 
