@@ -67,12 +67,10 @@ maxsents = 9                    # Maximum Number of Sentences (5 for Death Certi
 maxsents_co = 5                 # Number of Sentences in Death Certificate
 batch_size = 32                 # Batch size given to the model while training
 embedding_dims = 175            # Embedding Dimensions
+maxchars_word = 50              # Maximum number of chars in each token
 nb_epoch = 50                   # Number of epochs for training
 validation_split = 0.25         # Percentage of the dataset used in validation                                                         
 gru_output_size = 175           # GRU output dimension
-kernel_size = 5
-filters = 50
-pool_size = 4
 
 print('Loading data...')
 # Shape of each line in dataset:
@@ -168,13 +166,42 @@ X_train_ra, X_test_ra, y_train, y_test = train_test_split(ra, labels, stratify =
 tokenizer = Tokenizer(num_words = max_features)
 tokenizer.fit_on_texts(X_train_1a+X_train_1b+X_train_1c+X_train_1d+X_train_2+X_train_bic+X_train_bic_admiss+X_train_bic_sit+X_train_ra)
 
+#%%
+case2Idx = {'numeric': 1, 'allLower':2, 'allUpper':3, 'initialUpper':4, 'other':5, 'mainly_numeric':6, 'contains_digit': 7, 'PADDING_TOKEN':0}
+caseEmbeddings = np.identity(len(case2Idx), dtype='float32')
+char2Idx = {"PADDING":0, "UNKNOWN":1}
+for c in " 0123456789abcdefghijklmnopqrstuvwxyzàáâãéêíóôõúüABCDEFGHIJKLMNOPQRSTUVWXYZÀÁÂÃÉÊÍÓÔÕÚÜ.,-_()[]{}!?:;#'\"/\\%$`&=*+@^~|": char2Idx[c] = len(char2Idx)
+
+def getCasing(word, caseLookup):   
+    casing = 'other'
+    numDigits = 0
+    for char in word:
+        if char.isdigit(): numDigits += 1
+    digitFraction = numDigits / float(len(word))
+    if word.isdigit(): casing = 'numeric'
+    elif digitFraction > 0.5: casing = 'mainly_numeric'
+    elif word.islower(): casing = 'allLower'
+    elif word.isupper(): casing = 'allUpper'
+    elif word[0].isupper(): casing = 'initialUpper'
+    elif numDigits > 0: casing = 'contains_digit'
+    return caseLookup[casing]
+
+def getChars(word, charLookup):
+    aux = [ charLookup["PADDING"] ]
+    for char in word:
+        if char in charLookup: aux.append(charLookup[char])
+        else: aux.append(charLookup["UNKNOWN"])
+    while len(aux) < maxchars_word: aux.append(charLookup["PADDING"])
+    return np.array( aux )
+
 # attribute an integer to each token that occures in the texts 
 # conversion of each dataset entry in a (7,200) shape matrix resulting in variables:
 
 print('Computing Training Set...')
 
-# data is a (5,200) matrix for the strings in death certificates
 X_train = np.zeros((len(X_train_1a), maxsents, maxlen), dtype = 'int32')
+X_train_char = np.zeros((len(X_train_1a), maxsents, maxlen, maxchars_word), dtype = 'int32')
+X_train_casing = np.zeros((len(X_train_1a), maxsents, maxlen), dtype = 'int32')
 
 print('Loading death certificates...')
 
@@ -190,6 +217,8 @@ for m in range(len(death_cert)):
                 for _ , word in enumerate(wordTokens):
                     if k < maxlen and tokenizer.word_index[word] < max_features:
                         X_train[i,m,k] = tokenizer.word_index[word]
+                        X_train_casing[i,m,k] = getCasing(word,case2Idx)
+                        X_train_char[i,m,k,:] = getChars(word,char2Idx)
                         k = k + 1
                     
 print('Loading bic...')
@@ -206,6 +235,8 @@ for m in range(len(bic_components)):
                 for _ , word in enumerate(wordTokens):
                     if k < maxlen and tokenizer.word_index[word] < max_features:
                         X_train[i,5+m,k] = tokenizer.word_index[word]
+                        X_train_casing[i,5+m,k] = getCasing(word,case2Idx)
+                        X_train_char[i,5+m,k,:] = getChars(word,char2Idx)
                         k = k + 1
 
 print('Loading autopsy reports...')
@@ -219,6 +250,8 @@ for i, sentences in enumerate(X_train_ra):
             for _ , word in enumerate(wordTokens):
                 if k < maxlen and tokenizer.word_index[word] < max_features:
                     X_train[i,8,k] = tokenizer.word_index[word]
+                    X_train_casing[i,8,k] = getCasing(word,case2Idx)
+                    X_train_char[i,8,k,:] = getChars(word,char2Idx)
                     k = k + 1
 
 word_index = tokenizer.word_index
@@ -234,6 +267,8 @@ print('Found %s unique tokens.' % len(word_index))
 print('Computing Testing Set...')
 
 X_test = np.zeros((len(X_test_1a), maxsents, maxlen), dtype = 'int32')
+X_test_char = np.zeros((len(X_test_1a), maxsents, maxlen, maxchars_word), dtype = 'int32')
+X_test_casing = np.zeros((len(X_test_1a), maxsents, maxlen), dtype = 'int32')
 
 print('Loading Death certificates...')
 
@@ -251,10 +286,14 @@ for m in range(len(death_cert)):
                     aux = [(jellyfish.jaro_winkler(k,word),v) for k,v in word_index.items()]
                     if k < maxlen and max(aux)[1] < max_features:
                         X_test[i,m,k] = max(aux)[1]
+                        X_test_casing[i,m,k] = getCasing(word,case2Idx)
+                        X_test_char[i,m,k,:] = getChars(word,char2Idx)
                         k = k + 1
                 else:
                     if k < maxlen and word_index.get(word) < max_features:
                         X_test[i,m,k] = word_index.get(word)
+                        X_test_casing[i,m,k] = getCasing(word,case2Idx)
+                        X_test_char[i,m,k,:] = getChars(word,char2Idx)
                         k = k + 1
                     
 print('Loading bic...')
@@ -272,10 +311,14 @@ for m in range(len(bic_components)):
                     aux = [(jellyfish.jaro_winkler(k,word),v) for k,v in word_index.items()]
                     if k < maxlen and max(aux)[1] < max_features:
                         X_test[i,5+m,k] = max(aux)[1]
+                        X_test_casing[i,5+m,k] = getCasing(word,case2Idx)
+                        X_test_char[i,5+m,k,:] = getChars(word,char2Idx)
                         k = k + 1
                 else:
                     if k < maxlen and word_index.get(word) < max_features:
                         X_test[i,5+m,k] = word_index.get(word)
+                        X_test_casing[i,5+m,k] = getCasing(word,case2Idx)
+                        X_test_char[i,m,k,:] = getChars(word,char2Idx)
                         k = k + 1
 
 print('Loading autopsy reports...')
@@ -290,10 +333,14 @@ for i, sentences in enumerate(X_test_ra):
                 aux = [(jellyfish.jaro_winkler(k,word),v) for k,v in word_index.items()]
                 if k < maxlen and max(aux)[1] < max_features:
                     X_test[i,8,k] = max(aux)[1]
+                    X_test_casing[i,8,k] = getCasing(word,case2Idx)
+                    X_test_char[i,8,k,:] = getChars(word,char2Idx)
                     k = k + 1
             else:
                 if k < maxlen and word_index.get(word) < max_features:
                     X_test[i,8,k] = word_index.get(word)
+                    X_test_casing[i,8,k] = getCasing(word,case2Idx)
+                    X_test_char[i,8,k,:] = getChars(word,char2Idx)
                     k = k + 1
 
 #%%
@@ -398,21 +445,34 @@ init_m_3 = nmf.components_
 print('Build model...')
 
 # Inputs
-review_input = Input(shape=(maxsents,maxlen), dtype='int32')
+review_input_words = Input(shape=(maxsents,maxlen), dtype='int32')
+review_input_casing = Input(shape=(maxsents,maxlen), dtype='int32')
+review_input_chars = Input(shape=(maxsents,maxlen,maxchars_word), dtype='int32')
 aux_input = Input(shape=(y_train.shape[1],), dtype='float32')
 
-# Embedding Layer
-embedding_layer = Embedding(max_features, embedding_dims, input_length=maxlen)
+# Embedding Layers
+embedding_layer_words = Embedding(max_features, embedding_dims, input_length=maxlen)
+embedding_layer_casing = Embedding(output_dim=caseEmbeddings.shape[1], input_dim=caseEmbeddings.shape[0], weights=[caseEmbeddings], trainable=False)
+embedding_layer_character = Embedding(len(char2Idx),25,embeddings_initializer=keras.initializers.RandomUniform(minval=-0.5, maxval=0.5))
 
-# WORD-LEVEL
-sentence_input = Input(shape=(maxlen,), dtype='int32')
-embedded_sequences = embedding_layer(sentence_input)
+# WORD-LEVEL AND CHARACTER-LEVEL
+sentence_input_words = Input(shape=(maxlen,), dtype='int32')
+embedded_sequences_words = embedding_layer_words(sentence_input_words)
+sentence_input_casing = Input(shape=(maxlen,), dtype='int32')
+embedded_sequences_casing = embedding_layer_casing(sentence_input_casing)
+sentence_input_chars = Input(shape=(maxlen,maxchars_word), dtype='int32')
+embedded_sequences_chars = TimeDistributed(embedding_layer_character)(sentence_input_chars)
+embedded_sequences_chars = TimeDistributed(Bidirectional(GRU(embedding_dims, return_sequences=False)))(embedded_sequences_chars)
+
+review_words = TimeDistributed(Model(sentence_input_words, embedded_sequences_words))(review_input_words)
+review_casing = TimeDistributed(Model(sentence_input_casing, embedded_sequences_casing))(review_input_casing)
+review_chars = TimeDistributed(Model(sentence_input_chars, embedded_sequences_chars))(review_input_chars)
+review_embedded = keras.layers.Concatenate()( [ review_words , review_casing , review_chars] )
+review_embedded = TimeDistributed(TimeDistributed(Dense(embedding_dims,activation='relu')))(review_embedded)
 
 # Embedding Average or Convolutional Neural Network
-sentEmbed = Model(sentence_input, embedded_sequences)
-review_fasttext = TimeDistributed(sentEmbed)(review_input)
-#fasttext = GlobalAveragePooling2D()(review_fasttext)
-reshape = Reshape((maxsents*maxlen,embedding_dims))(review_fasttext)
+#fasttext = GlobalAveragePooling2D()(review_embedded)
+reshape = Reshape((maxsents*maxlen,embedding_dims))(review_embedded)
 conv1 = Conv1D(gru_output_size, kernel_size=2, activation='relu')(reshape)
 conv1 = MaxPool1D(int((maxsents*maxlen)/5))(conv1)
 conv1 = Flatten()(conv1)
@@ -426,29 +486,21 @@ concatenated_tensor = keras.layers.Concatenate(axis=1)([conv1,conv2,conv3])
 fasttext = Dense(units=gru_output_size, activation='relu')(concatenated_tensor)
 
 # Bidirectional GRU
-l_gru = Bidirectional(GRU(gru_output_size, return_sequences=True))(embedded_sequences)
-# Word-Level Attention Layer
-l_dense = TimeDistributed(Dense(units=gru_output_size))(l_gru)
-l_att = AttLayer()(l_dense)
-sentEncoder = Model(sentence_input, l_att)
-review_encoder = TimeDistributed(sentEncoder)(review_input)
+l_gru_sent = TimeDistributed(Bidirectional(GRU(gru_output_size, return_sequences=True)))(review_embedded)
+l_dense_sent = TimeDistributed(TimeDistributed(Dense(units=gru_output_size)))(l_gru_sent)
+l_att_sent = TimeDistributed(AttLayer())(l_dense_sent)
 
-# SENTENCE_LEVEL
 # Bidirectional GRU
-l_gru_sent = Bidirectional(GRU(gru_output_size, return_sequences=True))(review_encoder)
-# Sentence-Level Attention Layer
-l_gru_sent = keras.layers.Concatenate()( [ l_gru_sent , keras.layers.RepeatVector(maxsents)(fasttext) ] )
-l_dense_sent = TimeDistributed(Dense(units=gru_output_size))(l_gru_sent)
-postp = AttLayer()(l_dense_sent)
+l_gru_review = Bidirectional(GRU(gru_output_size, return_sequences=True))(l_att_sent)
+l_gru_review = keras.layers.Concatenate()( [ l_gru_review , keras.layers.RepeatVector(maxsents)(fasttext) ] )
+l_dense_review = TimeDistributed(Dense(units=gru_output_size))(l_gru_review)
+l_att_review = AttLayer()(l_dense_review)
 
 #Memory
 aux_mem = Dense(units=(gru_output_size+embedding_dims), activation='relu', weights=(init_m_full.transpose(),np.zeros(gru_output_size+embedding_dims)), name='memory')(aux_input)
-
-postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp , fasttext ] )
-postp_aux = Dropout(0.05)(postp_aux)
-postp_aux = keras.layers.Concatenate( axis = 1 )( [ postp_aux , aux_mem ] )
-
-postp = Dense(units=(gru_output_size+embedding_dims))(postp_aux)
+postp = keras.layers.Concatenate( axis = 1 )( [ l_att_review , fasttext , aux_mem ] )
+postp = Dropout(0.05)(postp)
+postp = Dense(units=(gru_output_size+embedding_dims))(postp)
 
 # Softmax
 preds = Dense(units=y_train.shape[1], activation='softmax', weights=(init_m_full,np.zeros(y_train.shape[1])), name='full_code')(postp)
@@ -461,14 +513,14 @@ model.save('modelo_baseline.h5')
 X_train_aux = model.predict_prob(X_train)[0]
 X_test_aux = model.predict_prob(X_test)[0]
 
-model = Model(inputs = [review_input, aux_input], outputs = [preds, preds_3char, preds_aux])
+model = Model(inputs=[review_input_words, review_input_casing, review_input_chars, aux_input], outputs = [preds, preds_3char, preds_aux])
 model.compile(loss=['categorical_crossentropy','categorical_crossentropy','binary_crossentropy'], optimizer='adam', metrics=['accuracy'], loss_weights = [0.8 , 0.85, 0.75])
 model.summary()
-model.fit([ X_train , X_train_aux ] , [y_train, y_train_3char, y_train_aux], batch_size=batch_size, epochs=nb_epoch, validation_data=([X_test,X_test_aux], [y_test, y_test_3char, y_test_aux]), callbacks=[earlyStopping])
+model.fit([ X_train , X_train_casing, X_train_char, X_train_aux ] , [y_train, y_train_3char, y_train_aux], batch_size=batch_size, epochs=nb_epoch, validation_data=([X_test,X_test_casing,X_test_char,X_test_aux], [y_test, y_test_3char, y_test_aux]), callbacks=[earlyStopping])
 model.save('modelo_full_nmf.h5')
 
 print('Predicting...')
-[all_4, all_3, all_aux] = model.predict([X_test,X_test_aux], batch_size=3)
+[all_4, all_3, all_aux] = model.predict([X_test,X_test_casing,X_test_char,X_test_aux], batch_size=3)
 
 print('Writing output...')
 
