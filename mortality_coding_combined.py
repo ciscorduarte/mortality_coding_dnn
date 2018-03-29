@@ -468,22 +468,22 @@ review_words = TimeDistributed(Model(sentence_input_words, embedded_sequences_wo
 review_casing = TimeDistributed(Model(sentence_input_casing, embedded_sequences_casing))(review_input_casing)
 review_chars = TimeDistributed(Model(sentence_input_chars, embedded_sequences_chars))(review_input_chars)
 review_embedded = keras.layers.Concatenate()( [ review_words , review_casing , review_chars] )
-review_embedded = TimeDistributed(TimeDistributed(Dense(embedding_dims,activation='relu')))(review_embedded)
+review_embedded = TimeDistributed(TimeDistributed(Dense(embedding_dims,activation='tanh')))(review_embedded)
 
 # Embedding Average or Convolutional Neural Network
 #fasttext = GlobalAveragePooling2D()(review_embedded)
 reshape = Reshape((maxsents*maxlen,embedding_dims))(review_embedded)
-conv1 = Conv1D(gru_output_size, kernel_size=2, activation='relu')(reshape)
+conv1 = Conv1D(gru_output_size, kernel_size=2, activation='tanh')(reshape)
 conv1 = MaxPool1D(int((maxsents*maxlen)/5))(conv1)
 conv1 = Flatten()(conv1)
-conv2 = Conv1D(gru_output_size, kernel_size=4, activation='relu')(reshape)
+conv2 = Conv1D(gru_output_size, kernel_size=4, activation='tanh')(reshape)
 conv2 = MaxPool1D(int((maxsents*maxlen)/5))(conv2)
 conv2 = Flatten()(conv2)
-conv3 = Conv1D(gru_output_size, kernel_size=8, activation='relu')(reshape)
+conv3 = Conv1D(gru_output_size, kernel_size=8, activation='tanh')(reshape)
 conv3 = MaxPool1D(int((maxsents*maxlen)/5))(conv3)
 conv3 = Flatten()(conv3)
 concatenated_tensor = keras.layers.Concatenate(axis=1)([conv1,conv2,conv3])
-fasttext = Dense(units=gru_output_size, activation='relu')(concatenated_tensor)
+fasttext = Dense(units=gru_output_size, activation='tanh')(concatenated_tensor)
 
 # Bidirectional GRU
 l_gru_sent = TimeDistributed(Bidirectional(GRU(gru_output_size, return_sequences=True)))(review_embedded)
@@ -497,7 +497,7 @@ l_dense_review = TimeDistributed(Dense(units=gru_output_size))(l_gru_review)
 l_att_review = AttLayer()(l_dense_review)
 
 #Memory
-aux_mem = Dense(units=(gru_output_size+embedding_dims), activation='relu', weights=(init_m_full.transpose(),np.zeros(gru_output_size+embedding_dims)), name='memory')(aux_input)
+aux_mem = Dense(units=(gru_output_size+embedding_dims), activation='tanh', weights=(init_m_full.transpose(),np.zeros(gru_output_size+embedding_dims)), name='memory')(aux_input)
 postp = keras.layers.Concatenate( axis = 1 )( [ l_att_review , fasttext , aux_mem ] )
 postp = Dropout(0.05)(postp)
 postp = Dense(units=(gru_output_size+embedding_dims))(postp)
