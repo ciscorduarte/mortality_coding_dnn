@@ -15,8 +15,8 @@ class LMWrapper(Model):
 
     def __init__(self, C=1.0, use_idf=False, two_vectors=True, filename=None, **kwargs):
         self.lm = MultinomialNB( )
-        self.vect1 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0, ngram_range=(1, 2))
-        self.vect2 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0, ngram_range=(1, 2))
+        self.vect1 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0, ngram_range=(1, 3))
+        self.vect2 = TfidfVectorizer(norm=None, use_idf=use_idf, min_df=0.0, ngram_range=(1, 3))
         self.output_dim = 0
         self.two_vectors = two_vectors
         if filename is not None: self.load(filename)
