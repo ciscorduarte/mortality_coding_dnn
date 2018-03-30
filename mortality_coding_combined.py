@@ -471,7 +471,7 @@ review_embedded = keras.layers.Concatenate()( [ review_words , review_casing , r
 review_embedded = TimeDistributed(TimeDistributed(Dense(embedding_dims,activation='tanh')))(review_embedded)
 
 # Embedding Average or Convolutional Neural Network
-#fasttext = GlobalAveragePooling2D()(review_embedded)
+fasttext = GlobalAveragePooling2D()(review_embedded)
 reshape = Reshape((maxsents*maxlen,embedding_dims))(review_embedded)
 conv1 = Conv1D(gru_output_size, kernel_size=2, activation='tanh')(reshape)
 conv1 = MaxPool1D(int((maxsents*maxlen)/5))(conv1)
@@ -482,11 +482,12 @@ conv2 = Flatten()(conv2)
 conv3 = Conv1D(gru_output_size, kernel_size=8, activation='tanh')(reshape)
 conv3 = MaxPool1D(int((maxsents*maxlen)/5))(conv3)
 conv3 = Flatten()(conv3)
-concatenated_tensor = keras.layers.Concatenate(axis=1)([conv1,conv2,conv3])
+concatenated_tensor = keras.layers.Concatenate(axis=1)([fasttext,conv1,conv2,conv3])
 fasttext = Dense(units=gru_output_size, activation='tanh')(concatenated_tensor)
 
 # Bidirectional GRU
 l_gru_sent = TimeDistributed(Bidirectional(GRU(gru_output_size, return_sequences=True)))(review_embedded)
+l_gru_sent = keras.layers.Concatenate()( [ l_gru_sent , keras.layers.RepeatVector(maxsents)(keras.layers.RepeatVector(maxlen)(fasttext)) ] )
 l_dense_sent = TimeDistributed(TimeDistributed(Dense(units=gru_output_size)))(l_gru_sent)
 l_att_sent = TimeDistributed(AttLayer())(l_dense_sent)
 
