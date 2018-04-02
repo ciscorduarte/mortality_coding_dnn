@@ -487,7 +487,7 @@ fasttext = Dense(units=gru_output_size, activation='tanh')(concatenated_tensor)
 
 # Bidirectional GRU
 l_gru_sent = TimeDistributed(Bidirectional(GRU(gru_output_size, return_sequences=True)))(review_embedded)
-l_gru_sent = keras.layers.Concatenate()( [ l_gru_sent , keras.layers.RepeatVector(maxsents)(keras.layers.RepeatVector(maxlen)(fasttext)) ] )
+l_gru_sent = keras.layers.Concatenate()( [ l_gru_sent , Reshape((maxsents,maxlen,gru_output_size))( keras.layers.RepeatVector(maxsents*maxlen)(fasttext) ) ] )
 l_dense_sent = TimeDistributed(TimeDistributed(Dense(units=gru_output_size)))(l_gru_sent)
 l_att_sent = TimeDistributed(AttLayer())(l_dense_sent)
 
